@@ -10,7 +10,17 @@ var User = mongoose.model('User');
 //	our middleware to check if user is logged in or not by passed jwt token.
 var auth = jwt({
 	secret: 'conduit', 
-	userProperty: 'payload'
+	userProperty: 'payload',
+	getToken: function fromHeaderOrQuerystring (req) {
+		if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Bearer') {
+			return req.headers.authorization.split(' ')[1];
+		}else if (req.headers.authorization && req.headers.authorization.split(' ')[0] === 'Token') {
+			return req.headers.authorization.split(' ')[1];
+		} else if (req.query && req.query.token) {
+			return req.query.token;
+		}
+		return null;
+	}
 });
 
 // Preload article objects on routes with ':article'
@@ -27,11 +37,10 @@ router.param('article', function(req, res, next, id) {
 });
 
 router.param('username', function(req, res, next, username) {
-	var query = User.findOne({ username: username});
-	query.exec(function (err, user){
+	console.log('> ' + username );
+	User.findOne({ username: username}, function (err, user) {
 		if (err) { return next(err); }
 		if (!user) { return next(new Error("can't find user")); }
-		
 		req.user = user;
 		return next();
 	});
@@ -58,12 +67,12 @@ router.get('/api/user', auth, function(req, res, next){
 		if (!user) { return next(new Error("can't find user")); }
 		if(user){
 			return res.json({user:{
-				user.username,
-				user.email,
+				username: user.username,
+				email: user.email,
 				token: user.generateJWT()
 			}});
 		}
-	})(req, res, next);
+	});
 });
 
 router.put('/api/user', auth, function(req, res, next){
@@ -74,30 +83,30 @@ router.put('/api/user', auth, function(req, res, next){
 		if (!user) { return next(new Error("can't find user")); }
 		if(user){
 			return res.json({user:{
-				user.username,
-				user.email,
+				username: user.username,
+				email: user.email,
 				token: user.generateJWT()
 			}});
 		}
-	})(req, res, next);
+	});
 });
 
 router.post('/api/users/login', function(req, res, next){
 	if(!req.body.user.email || !req.body.user.password){
 		return res.status(400).json({message: 'Please fill out all fields'});
 	}
-	User.findOne({ username: req.body.user.email }, function (err, user) {
+	User.findOne({ email: req.body.user.email }, function (err, user) {
 		if (err) { return next(err); }
 		if (!user) {
-			return return next(new Error("Incorrect username.");
+			return next(new Error("Incorrect username."));
 		}
 		if (!user.validPassword(req.body.user.password)) {
-			return next(new Error("Incorrect password.");
+			return next(new Error("Incorrect password."));
 		}
 		if(user){
 			return res.json({user:{
-				user.username,
-				user.email,
+				username: user.username,
+				email: user.email,
 				token: user.generateJWT()
 			}});
 		} else {
@@ -120,8 +129,8 @@ router.post('/api/users', function(req, res, next){
 	user.save(function (err){
 		if(err){ return next(err); }
 		return res.json({user:{
-			user.username,
-			user.email,
+			username: user.username,
+			email: user.email,
 			token: user.generateJWT()
 		}});
 	});
@@ -154,7 +163,7 @@ router.post('/api/profiles/:username/follow', auth, function(req, res, next){
 				}});
 			});
 		}
-	})(req, res, next);	
+	});	
 });
 
 router.delete('/api/profiles/:username/follow', auth, function(req, res, next){
