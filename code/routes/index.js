@@ -24,20 +24,16 @@ var auth = jwt({
 });
 
 // Preload article objects on routes with ':article'
-router.param('article', function(req, res, next, id) {
-	var query = Article.findById(id);
-	
-	query.exec(function (err, article){
+router.param('article', function(req, res, next, slug) {
+	Article.findOne({ slug: slug}, function (err, article) {
 		if (err) { return next(err); }
 		if (!article) { return next(new Error("can't find article")); }
-		
 		req.article = article;
 		return next();
 	});
 });
 
 router.param('username', function(req, res, next, username) {
-	console.log('> ' + username );
 	User.findOne({ username: username}, function (err, user) {
 		if (err) { return next(err); }
 		if (!user) { return next(new Error("can't find user")); }
@@ -82,11 +78,30 @@ router.put('/api/user', auth, function(req, res, next){
 		if (err) { return next(err); }
 		if (!user) { return next(new Error("can't find user")); }
 		if(user){
-			return res.json({user:{
-				username: user.username,
-				email: user.email,
-				token: user.generateJWT()
-			}});
+			// only update fields that were actually passed...
+			if( typeof req.body.user.username !== 'undefined' ){
+				user.username = req.body.user.username;
+			}
+			if( typeof req.body.user.email !== 'undefined' ){
+				user.email = req.body.user.email;
+			}
+			if( typeof req.body.user.bio !== 'undefined' ){
+				user.bio = req.body.user.bio;
+			}
+			if( typeof req.body.user.image !== 'undefined' ){
+				user.image = req.body.user.image;
+			}
+			if( typeof req.body.user.password !== 'undefined' ){
+				user.setPassword(req.body.user.password);
+			}
+			user.save(function (err){
+				if(err){ return next(err); }
+				return res.json({user:{
+					username: user.username,
+					email: user.email,
+					token: user.generateJWT()
+				}});
+			});
 		}
 	});
 });
@@ -171,14 +186,65 @@ router.delete('/api/profiles/:username/follow', auth, function(req, res, next){
 });
 
 /*
+User.find({}).populate({
+	path: 'favorites',
+	match: { age: { $gte: 18 }},
+	select: 'name age -_id'
+}).exec()
+*/
+
 router.get('/api/articles', function(req, res, next) {
-	Article.find(function(err, articles){
+	var query = {};
+	if( typeof req.params.author !== 'undefined' ){
+
+	}else if( typeof req.params.favorited !== 'undefined' ){
+
+	}else if( typeof req.params.tag !== 'undefined' ){
+
+	}
+
+	Article.find(query, function(err, articles){
 		if(err){ return next(err); }
-		res.json(articles);
-	});
+		var returnValue = [];
+		articles.forEach( function( article ){
+			returnValue.push({
+				"slug": article.slug,
+				"title": article.title,
+				"description": article.description,
+				"body": article.body,
+				"createdAt": article.createdAt,
+				"updatedAt": article.updatedAt,
+				"favorited": false,
+				"favoritesCount": 0,
+				"author": {
+					"username": article.author.username,
+					"bio": article.author.bio,
+					"image": article.author.image,
+					"following": false
+				}
+			});
+		});
+		res.json({"articles": returnValue});
+	}).populate('author');
 });
 
+
 router.get('/api/articles/feed', auth, function(req, res, next) {
+/*
+	var id = req.payload.id;
+	var follow = req.user._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.populate('following', function(err, user) {
+				//	get 10 most recent articles published by list of users this user is following...
+				
+			});
+		}
+	});
+*/
 	Article.find(function(err, articles){
 		if(err){ return next(err); }
 		res.json(articles);
@@ -186,28 +252,75 @@ router.get('/api/articles/feed', auth, function(req, res, next) {
 });
 
 router.post('/api/articles', auth, function(req, res, next) {
-	var article = new Article(req.body);
-	article.author = req.payload.username;
-	
-	article.save(function(err, article){
-		if(err){ return next(err); }
-		res.json(article);
+	var id = req.payload.id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			var article = new Article(req.body.article);
+			article.author = user;
+			article.slugify();	
+			article.save(function(err, article){
+				if(err){ return next(err); }
+				res.json({article:{
+					"slug": article.slug,
+					"title": article.title,
+					"description": article.description,
+					"body": article.body,
+					"createdAt": article.createdAt,
+					"updatedAt": article.updatedAt,
+					"favorited": false,
+					"favoritesCount": 0,
+					"author": {
+						"username": user.username,
+						"bio": user.bio,
+						"image": user.image,
+						"following": false
+					}
+				}});
+			});
+		}
 	});
 });
 
 // return a article
 router.get('/api/articles/:article', function(req, res, next) {
-	req.article.populate('comments tags author', function(err, article) {
+	req.article.populate('comments author', function(err, article) {
+		res.json({article:{
+			"slug": article.slug,
+			"title": article.title,
+			"description": article.description,
+			"body": article.body,
+			"createdAt": article.createdAt,
+			"updatedAt": article.updatedAt,
+			"favorited": false,
+			"favoritesCount": 0,
+			"author": {
+				"username": article.author.username,
+				"bio": article.author.bio,
+				"image": article.author.image,
+				"following": false
+			}
+		}});
+	});
+});
+/*
+
+// update article
+router.put('/api/articles/:article', function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
 		res.json(article);
 	});
 });
 
-// update article
-router.get('/api/articles/:article', function(req, res, next) {
-	req.article.populate('comments tags author', function(err, article) {
+// delete article
+router.delete('/api/articles/:article', function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
 		res.json(article);
 	});
 });
+
 
 
 router.put('/api/articles/:article/favorite', auth, function(req, res, next) {
