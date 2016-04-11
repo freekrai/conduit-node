@@ -62,11 +62,7 @@ router.get('/api/user', auth, function(req, res, next){
 		if (err) { return next(err); }
 		if (!user) { return next(new Error("can't find user")); }
 		if(user){
-			return res.json({user:{
-				username: user.username,
-				email: user.email,
-				token: user.generateJWT()
-			}});
+			return userCallback(res, user, 'user');	
 		}
 	});
 });
@@ -96,11 +92,7 @@ router.put('/api/user', auth, function(req, res, next){
 			}
 			user.save(function (err){
 				if(err){ return next(err); }
-				return res.json({user:{
-					username: user.username,
-					email: user.email,
-					token: user.generateJWT()
-				}});
+				return userCallback(res, user, 'user');
 			});
 		}
 	});
@@ -119,11 +111,7 @@ router.post('/api/users/login', function(req, res, next){
 			return next(new Error("Incorrect password."));
 		}
 		if(user){
-			return res.json({user:{
-				username: user.username,
-				email: user.email,
-				token: user.generateJWT()
-			}});
+			return userCallback(res, user, 'user');
 		} else {
 			return res.status(401).json(info);
 		}
@@ -143,21 +131,12 @@ router.post('/api/users', function(req, res, next){
 	
 	user.save(function (err){
 		if(err){ return next(err); }
-		return res.json({user:{
-			username: user.username,
-			email: user.email,
-			token: user.generateJWT()
-		}});
+		return userCallback(res, user, 'user');		
 	});
 });
 
 router.get('/api/profiles/:username', function(req, res, next){
-	res.json({profile:{
-		"username": req.user.username,
-		"bio": req.user.bio,
-		"image": req.user.image,
-		"following": false		
-	}});
+	userCallback(res, req.user, 'profile');
 });
 
 router.post('/api/profiles/:username/follow', auth, function(req, res, next){
@@ -170,12 +149,7 @@ router.post('/api/profiles/:username/follow', auth, function(req, res, next){
 		if(user){
 			user.follow(follow, function(err, user){
 				if (err) { return next(err); }
-				res.json({profile:{
-					"username": user.username,
-					"bio": user.bio,
-					"image": user.image,
-					"following": true
-				}});
+				return userCallback(res, user, 'profile');
 			});
 		}
 	});	
@@ -196,15 +170,119 @@ User.find({}).populate({
 router.get('/api/articles', function(req, res, next) {
 	var query = {};
 	if( typeof req.params.author !== 'undefined' ){
-
-	}else if( typeof req.params.favorited !== 'undefined' ){
-
-	}else if( typeof req.params.tag !== 'undefined' ){
+		query['author'] = req.params.author;
+	}
+	if( typeof req.params.favorited !== 'undefined' ){
 
 	}
+	if( typeof req.params.tag !== 'undefined' ){
 
+	}
+	if( typeof req.params.limit !== 'undefined' ){
+
+	}
+	if( typeof req.params.offset !== 'undefined' ){
+
+	}
 	Article.find(query, function(err, articles){
 		if(err){ return next(err); }
+		articleCallback(res, articles );
+	}).populate('author');
+});
+
+
+router.get('/api/articles/feed', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			//	get 10 most recent articles published by list of users this user is following...
+			var query = {};
+			if( typeof user.following !== 'undefined' ){
+				query['author'] = {"$in" : user.following};
+			}
+			if( typeof req.params.limit !== 'undefined' ){
+		
+			}
+			if( typeof req.params.offset !== 'undefined' ){
+		
+			}
+			Article.find(query, function(err, articles){
+				if(err){ return next(err); }
+				articleCallback(res, articles );
+			}).populate('author');
+		}
+	})
+});
+
+router.post('/api/articles', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			var article = new Article(req.body.article);
+			article.author = user;
+			article.slugify();	
+			article.save(function(err, article){
+				if(err){ return next(err); }
+				articleCallback(res, article, true );
+			});
+		}
+	});
+});
+
+// return a article
+router.get('/api/articles/:article', function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		articleCallback(res, article, true );
+	});
+});
+
+
+// handle output of user info, either "user" or "profile"
+function userCallback(res, user, key ){
+	if( key === 'user' ){
+		return res.json({user:{
+			username: user.username,
+			email: user.email,
+			token: user.generateJWT()
+		}});
+	}else{
+		return res.json({profile:{
+			"username": user.username,
+			"bio": user.bio,
+			"image": user.image,
+			"following": false
+		}});
+	}	
+}
+
+// handle output of articles.
+function articleCallback(res, articles, single ){
+	var single = single || false;
+	if( single ){
+		var article = articles;
+		res.json({article:{
+			"slug": article.slug,
+			"title": article.title,
+			"description": article.description,
+			"body": article.body,
+			"createdAt": article.createdAt,
+			"updatedAt": article.updatedAt,
+			"favorited": false,
+			"favoritesCount": 0,
+			"author": {
+				"username": article.author.username,
+				"bio": article.author.bio,
+				"image": article.author.image,
+				"following": false
+			}
+		}});	
+	}else{
 		var returnValue = [];
 		articles.forEach( function( article ){
 			returnValue.push({
@@ -225,86 +303,8 @@ router.get('/api/articles', function(req, res, next) {
 			});
 		});
 		res.json({"articles": returnValue});
-	}).populate('author');
-});
-
-
-router.get('/api/articles/feed', auth, function(req, res, next) {
-/*
-	var id = req.payload.id;
-	var follow = req.user._id;
-	var query = User.findById(id);
-	query.exec(function (err, user){
-		if (err) { return next(err); }
-		if (!user) { return next(new Error("can't find user")); }
-		if(user){
-			user.populate('following', function(err, user) {
-				//	get 10 most recent articles published by list of users this user is following...
-				
-			});
-		}
-	});
-*/
-	Article.find(function(err, articles){
-		if(err){ return next(err); }
-		res.json(articles);
-	});
-});
-
-router.post('/api/articles', auth, function(req, res, next) {
-	var id = req.payload.id;
-	var query = User.findById(id);
-	query.exec(function (err, user){
-		if (err) { return next(err); }
-		if (!user) { return next(new Error("can't find user")); }
-		if(user){
-			var article = new Article(req.body.article);
-			article.author = user;
-			article.slugify();	
-			article.save(function(err, article){
-				if(err){ return next(err); }
-				res.json({article:{
-					"slug": article.slug,
-					"title": article.title,
-					"description": article.description,
-					"body": article.body,
-					"createdAt": article.createdAt,
-					"updatedAt": article.updatedAt,
-					"favorited": false,
-					"favoritesCount": 0,
-					"author": {
-						"username": user.username,
-						"bio": user.bio,
-						"image": user.image,
-						"following": false
-					}
-				}});
-			});
-		}
-	});
-});
-
-// return a article
-router.get('/api/articles/:article', function(req, res, next) {
-	req.article.populate('comments author', function(err, article) {
-		res.json({article:{
-			"slug": article.slug,
-			"title": article.title,
-			"description": article.description,
-			"body": article.body,
-			"createdAt": article.createdAt,
-			"updatedAt": article.updatedAt,
-			"favorited": false,
-			"favoritesCount": 0,
-			"author": {
-				"username": article.author.username,
-				"bio": article.author.bio,
-				"image": article.author.image,
-				"following": false
-			}
-		}});
-	});
-});
+	}
+}
 /*
 
 // update article
