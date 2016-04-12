@@ -3,6 +3,7 @@ var router = express.Router();
 var jwt = require('express-jwt');
 var passport = require('passport');
 var mongoose = require('mongoose');
+var _ = require('underscore');
 var Article = mongoose.model('Article');
 var Comment = mongoose.model('Comment');
 var User = mongoose.model('User');
@@ -279,7 +280,6 @@ router.get('/api/articles/:article', function(req, res, next) {
 
 // update article
 router.put('/api/articles/:article', auth, function(req, res, next) {
-title, description, body
 	if( typeof req.body.article.title !== 'undefined' ){
 		req.article.title = req.body.article.title;
 		req.article.slug();
@@ -306,7 +306,7 @@ router.delete('/api/articles/:article', auth, function(req, res, next) {
 
 
 
-router.put('/api/articles/:article/favorite', auth, function(req, res, next) {
+router.post('/api/articles/:article/favorite', auth, function(req, res, next) {
 	var id = req.payload.id;
 	var favorite = req.article._id;
 	var query = User.findById(id);
@@ -316,7 +316,7 @@ router.put('/api/articles/:article/favorite', auth, function(req, res, next) {
 		if(user){
 			user.favorite(favorite, function(err, user){
 				if (err) { return next(err); }
-				return articleCallback(res, req.article, single);
+				return articleCallback(res, req.article, true);
 			});
 		}
 	});	
@@ -332,7 +332,7 @@ router.delete('/api/articles/:article/favorite', auth, function(req, res, next) 
 		if(user){
 			user.unfavorite(favorite, function(err, user){
 				if (err) { return next(err); }
-				return articleCallback(res, req.article, single);
+				return articleCallback(res, req.article, true);
 			});
 		}
 	});	
@@ -340,16 +340,17 @@ router.delete('/api/articles/:article/favorite', auth, function(req, res, next) 
 
 // return a list of tags
 router.get('/api/tags', function(req, res, next) {
-	Article.find(query, function(err, articles){
+	Article.find({}, function(err, articles){
 		if(err){ return next(err); }
 		var returnValue = [];
 		articles.forEach( function( article ){
 			var tags = article.tagList;
-			tags.forEach( function( tag ){
-				returnValue[ tag ] = tag;
-			});
+			for(var i = 0; i < tags.length; i++) {
+				returnValue.push( tags[i] );
+			}
 		});
-		res.json({"tags": returnValue);
+		returnValue = _.uniq( returnValue );
+		res.json({"tags": returnValue});
 	})
 });
 
@@ -379,22 +380,9 @@ router.post('/api/articles/:article/comments', auth, function(req, res, next) {
 });
 
 router.delete('/api/articles/:article/comments/:comment', auth, function(req, res, next) {
-	var comment = new Comment(req.comment.body);
-	comment.article = req.article;
-	comment.comment = req.comment;
-	comment.author = req.payload.username;
-	
-	comment.save(function(err, comment){
-		if(err){ return next(err); }
-		req.article.comments.push(comment);
-		req.article.save(function(err, article) {
-			if(err){ return next(err); }
-			
-			res.json(comment);
-		});
-	});
+	req.comment.remove();
+	commentsCallback(res, req.comment, true );
 });
-*/
 
 // handle output of user info, either "user" or "profile"
 function userCallback(res, user, key ){
