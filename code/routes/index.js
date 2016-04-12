@@ -338,12 +338,28 @@ router.delete('/api/articles/:article/favorite', auth, function(req, res, next) 
 	});	
 });
 
-// return a article
-router.get('/api/articles/:article/comments', auth, function(req, res, next) {
+// return a list of tags
+router.get('/api/tags', function(req, res, next) {
+	Article.find(query, function(err, articles){
+		if(err){ return next(err); }
+		var returnValue = [];
+		articles.forEach( function( article ){
+			var tags = article.tagList;
+			tags.forEach( function( tag ){
+				returnValue[ tag ] = tag;
+			});
+		});
+		res.json({"tags": returnValue);
+	})
+});
+
+// return an article's comments
+router.get('/api/articles/:article/comments', function(req, res, next) {
 	req.article.populate('comments author', function(err, article) {
 		commentsCallback(res, req.article.comments);
 	});
 });
+
 
 // create a new comment
 router.post('/api/articles/:article/comments', auth, function(req, res, next) {
