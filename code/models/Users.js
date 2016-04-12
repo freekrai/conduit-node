@@ -29,6 +29,30 @@ UserSchema.methods.follow = function(id, cb){
 	this.save(cb);
 };
 
+UserSchema.methods.unfollow = function(id, cb){
+	for(var i = 0; i <= this.following.length; i++) {
+		if( this.following[i] === id ){
+			delete this.following[i];
+		}
+	}
+	this.save(cb);
+};
+
+
+UserSchema.methods.favorite = function(id, cb){
+	this.favorites.push( id );
+	this.save(cb);
+};
+UserSchema.methods.unfavorite = function(id, cb){
+	for(var i = 0; i <= this.favorites.length; i++) {
+		if( this.favorites[i] === id ){
+			delete this.favorites[i];
+		}
+	}
+	this.save(cb);
+};
+
+
 UserSchema.methods.generateJWT = function() {
 	var today = new Date();
 	var exp = new Date(today);

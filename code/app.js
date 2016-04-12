@@ -27,7 +27,6 @@ if ( !isProduction ) {
 // mongoose handling...
 var mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/conduit');
-require('./models/Tags');
 require('./models/Articles');
 require('./models/Users');
 require('./models/Comments');

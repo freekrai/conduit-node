@@ -156,7 +156,19 @@ router.post('/api/profiles/:username/follow', auth, function(req, res, next){
 });
 
 router.delete('/api/profiles/:username/follow', auth, function(req, res, next){
-	
+	var id = req.payload.id;
+	var follow = req.user._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.unfollow(follow, function(err, user){
+				if (err) { return next(err); }
+				return userCallback(res, user, 'profile');
+			});
+		}
+	});		
 });
 
 /*
@@ -173,21 +185,36 @@ router.get('/api/articles', function(req, res, next) {
 		query['author'] = req.params.author;
 	}
 	if( typeof req.params.favorited !== 'undefined' ){
-
+		User.find({username: req.params.favorited}, function(err, user){
+			if (err) { return next(err); }
+			if (!user) { return next(new Error("can't find user")); }
+			if(user){
+				//	get 10 most recent articles published by list of users this user is following...
+				var query = {};
+				if( typeof user.favorites !== 'undefined' ){
+					query['_id'] = {"$in" : user.favorites};
+				}
+			}
+		});
 	}
+	var limit = 20;
+	var offset = 0;
 	if( typeof req.params.tag !== 'undefined' ){
-
+		query['tagList'] = {"$in" : req.params.tag};
 	}
 	if( typeof req.params.limit !== 'undefined' ){
-
+		limit = req.params.limit;
 	}
 	if( typeof req.params.offset !== 'undefined' ){
-
+		offset = req.params.offset;
 	}
 	Article.find(query, function(err, articles){
 		if(err){ return next(err); }
 		articleCallback(res, articles );
-	}).populate('author');
+	})
+	.limit( limit )
+	.skip( offset )
+	.populate('author');
 });
 
 
@@ -203,16 +230,24 @@ router.get('/api/articles/feed', auth, function(req, res, next) {
 			if( typeof user.following !== 'undefined' ){
 				query['author'] = {"$in" : user.following};
 			}
+			var limit = 20;
+			var offset = 0;
+			if( typeof req.params.tag !== 'undefined' ){
+				query['tagList'] = {"$in" : req.params.tag};
+			}
 			if( typeof req.params.limit !== 'undefined' ){
-		
+				limit = req.params.limit;
 			}
 			if( typeof req.params.offset !== 'undefined' ){
-		
+				offset = req.params.offset;
 			}
 			Article.find(query, function(err, articles){
 				if(err){ return next(err); }
 				articleCallback(res, articles );
-			}).populate('author');
+			})
+			.limit( limit )
+			.skip( offset )
+			.populate('author');
 		}
 	})
 });
@@ -242,6 +277,108 @@ router.get('/api/articles/:article', function(req, res, next) {
 	});
 });
 
+// update article
+router.put('/api/articles/:article', auth, function(req, res, next) {
+title, description, body
+	if( typeof req.body.article.title !== 'undefined' ){
+		req.article.title = req.body.article.title;
+		req.article.slug();
+	}
+	if( typeof req.body.article.description !== 'undefined' ){
+		req.article.description = req.body.article.description;
+	}
+	if( typeof req.body.article.body !== 'undefined' ){
+		req.article.body = req.body.article.body;
+	}
+	req.article.save(function(err, article){
+		if(err){ return next(err); }
+		articleCallback(res, article, true );
+	});
+});
+
+// delete article
+router.delete('/api/articles/:article', auth, function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		req.article.remove();
+		articleCallback(res, article, true );
+	});
+});
+
+
+
+router.put('/api/articles/:article/favorite', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var favorite = req.article._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.favorite(favorite, function(err, user){
+				if (err) { return next(err); }
+				return articleCallback(res, req.article, single);
+			});
+		}
+	});	
+});
+
+router.delete('/api/articles/:article/favorite', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var favorite = req.article._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.unfavorite(favorite, function(err, user){
+				if (err) { return next(err); }
+				return articleCallback(res, req.article, single);
+			});
+		}
+	});	
+});
+
+// return a article
+router.get('/api/articles/:article/comments', auth, function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		commentsCallback(res, req.article.comments);
+	});
+});
+
+// create a new comment
+router.post('/api/articles/:article/comments', auth, function(req, res, next) {
+	var comment = new Comment(req.comment.body);
+	comment.article = req.article;
+	comment.author = req.payload.username;
+	
+	comment.save(function(err, comment){
+		if(err){ return next(err); }
+		req.article.comments.push(comment);
+		req.article.save(function(err, article) {
+			if(err){ return next(err); }
+			
+			res.json(comment);
+		});
+	});
+});
+
+router.delete('/api/articles/:article/comments/:comment', auth, function(req, res, next) {
+	var comment = new Comment(req.comment.body);
+	comment.article = req.article;
+	comment.comment = req.comment;
+	comment.author = req.payload.username;
+	
+	comment.save(function(err, comment){
+		if(err){ return next(err); }
+		req.article.comments.push(comment);
+		req.article.save(function(err, article) {
+			if(err){ return next(err); }
+			
+			res.json(comment);
+		});
+	});
+});
+*/
 
 // handle output of user info, either "user" or "profile"
 function userCallback(res, user, key ){
@@ -258,6 +395,39 @@ function userCallback(res, user, key ){
 			"image": user.image,
 			"following": false
 		}});
+	}	
+}
+
+// handle output of comments
+function commentCallback(res, comments, single ){
+	var single = single || false;
+	if( single ){
+		var comment = comments;
+		res.json({comment:{
+			"body": comment.body,
+			"createdAt": comment.createdAt,
+			"author": {
+				"username": comment.author.username,
+				"bio": comment.author.bio,
+				"image": comment.author.image,
+				"following": false
+			}
+		}});	
+	}else{
+		var returnValue = [];
+		comments.forEach( function( comments ){
+			returnValue.push({
+				"body": comment.body,
+				"createdAt": comment.createdAt,
+				"author": {
+					"username": comment.author.username,
+					"bio": comment.author.bio,
+					"image": comment.author.image,
+					"following": false
+				}
+			});
+		});
+		res.json({"comments": returnValue});
 	}	
 }
 
@@ -302,74 +472,8 @@ function articleCallback(res, articles, single ){
 				}
 			});
 		});
-		res.json({"articles": returnValue});
+		res.json({"articles": returnValue, 'articlesCount': returnValue.length});
 	}
 }
-/*
 
-// update article
-router.put('/api/articles/:article', function(req, res, next) {
-	req.article.populate('comments author', function(err, article) {
-		res.json(article);
-	});
-});
-
-// delete article
-router.delete('/api/articles/:article', function(req, res, next) {
-	req.article.populate('comments author', function(err, article) {
-		res.json(article);
-	});
-});
-
-
-
-router.put('/api/articles/:article/favorite', auth, function(req, res, next) {
-	req.article.favorite(function(err, post){
-		if (err) { return next(err); }
-		res.json(post);
-	});
-});
-
-router.delete('/api/articles/:article/favorite', auth, function(req, res, next) {
-	req.article.favorite(function(err, post){
-		if (err) { return next(err); }
-		res.json(post);
-	});
-});
-
-
-// create a new comment
-router.post('/api/articles/:article/comments', auth, function(req, res, next) {
-	var comment = new Comment(req.body);
-	comment.article = req.article;
-	comment.author = req.payload.username;
-	
-	comment.save(function(err, comment){
-		if(err){ return next(err); }
-		req.article.comments.push(comment);
-		req.article.save(function(err, article) {
-			if(err){ return next(err); }
-			
-			res.json(comment);
-		});
-	});
-});
-
-router.delete('/api/articles/:article/comments/:comment', auth, function(req, res, next) {
-	var comment = new Comment(req.body);
-	comment.article = req.article;
-	comment.comment = req.comment;
-	comment.author = req.payload.username;
-	
-	comment.save(function(err, comment){
-		if(err){ return next(err); }
-		req.article.comments.push(comment);
-		req.article.save(function(err, article) {
-			if(err){ return next(err); }
-			
-			res.json(comment);
-		});
-	});
-});
-*/
 module.exports = router;
