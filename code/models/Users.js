@@ -7,7 +7,7 @@ var UserSchema = new mongoose.Schema({
 	email: {type: String, lowercase: true, unique: true},
     bio: String,
     image: String,
-	favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
+	favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Article' }],
 	following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],	
 	hash: String,
 	salt: String
@@ -30,11 +30,7 @@ UserSchema.methods.follow = function(id, cb){
 };
 
 UserSchema.methods.unfollow = function(id, cb){
-	for(var i = 0; i <= this.following.length; i++) {
-		if( this.following[i] === id ){
-			delete this.following[i];
-		}
-	}
+	this.following.remove(id);
 	this.save(cb);
 };
 
@@ -44,11 +40,7 @@ UserSchema.methods.favorite = function(id, cb){
 	this.save(cb);
 };
 UserSchema.methods.unfavorite = function(id, cb){
-	for(var i = 0; i <= this.favorites.length; i++) {
-		if( this.favorites[i] === id ){
-			delete this.favorites[i];
-		}
-	}
+	this.favorites.remove(id);
 	this.save(cb);
 };
 

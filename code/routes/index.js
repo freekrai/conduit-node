@@ -172,14 +172,6 @@ router.delete('/api/profiles/:username/follow', auth, function(req, res, next){
 	});		
 });
 
-/*
-User.find({}).populate({
-	path: 'favorites',
-	match: { age: { $gte: 18 }},
-	select: 'name age -_id'
-}).exec()
-*/
-
 router.get('/api/articles', function(req, res, next) {
 	var query = {};
 	if( typeof req.params.author !== 'undefined' ){
@@ -405,9 +397,10 @@ function userCallback(res, user, key ){
 // handle output of comments
 function commentCallback(res, comments, single ){
 	var single = single || false;
+	var returnValue = [];
 	if( single ){
 		var comment = comments;
-		res.json({comment:{
+		returnValue.push({
 			"body": comment.body,
 			"createdAt": comment.createdAt,
 			"author": {
@@ -416,7 +409,7 @@ function commentCallback(res, comments, single ){
 				"image": comment.author.image,
 				"following": false
 			}
-		}});	
+		});	
 	}else{
 		var returnValue = [];
 		comments.forEach( function( comments ){
@@ -431,16 +424,22 @@ function commentCallback(res, comments, single ){
 				}
 			});
 		});
-		res.json({"comments": returnValue});
 	}	
+	if( returnValue.length > 1 ){
+		res.json({"comments": returnValue});
+	}else{
+		res.json({"comment": returnValue});
+	}
 }
 
 // handle output of articles.
 function articleCallback(res, articles, single ){
 	var single = single || false;
+	var returnValue = [];
 	if( single ){
 		var article = articles;
-		res.json({article:{
+		article.favorited();
+		returnValue.push({
 			"slug": article.slug,
 			"title": article.title,
 			"description": article.description,
@@ -448,17 +447,17 @@ function articleCallback(res, articles, single ){
 			"createdAt": article.createdAt,
 			"updatedAt": article.updatedAt,
 			"favorited": false,
-			"favoritesCount": 0,
+			"favoritesCount": article.favoritesCount,
 			"author": {
 				"username": article.author.username,
 				"bio": article.author.bio,
 				"image": article.author.image,
 				"following": false
 			}
-		}});	
+		});	
 	}else{
-		var returnValue = [];
 		articles.forEach( function( article ){
+			article.favorited();
 			returnValue.push({
 				"slug": article.slug,
 				"title": article.title,
@@ -467,7 +466,7 @@ function articleCallback(res, articles, single ){
 				"createdAt": article.createdAt,
 				"updatedAt": article.updatedAt,
 				"favorited": false,
-				"favoritesCount": 0,
+				"favoritesCount": article.favoritesCount,
 				"author": {
 					"username": article.author.username,
 					"bio": article.author.bio,
@@ -476,7 +475,11 @@ function articleCallback(res, articles, single ){
 				}
 			});
 		});
+	}
+	if( returnValue.length > 1 ){
 		res.json({"articles": returnValue, 'articlesCount': returnValue.length});
+	}else{
+		res.json({"article": returnValue});
 	}
 }
 
