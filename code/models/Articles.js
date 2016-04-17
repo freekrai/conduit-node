@@ -18,15 +18,29 @@ ArticleSchema.methods.slugify = function() {
 	this.slug = slug( this.title );
 };
 
-ArticleSchema.methods.favorited = function() {
+ArticleSchema.methods.favorited = function(cb) {
 	var self = this;
 	User.count({}, function( err, count){
 		self.favoritesCount = count;
+		self.save(cb);
 	}).populate({
 		path: 'favorites',
 		match: { favorites: { $in: self._id }},
 		select: 'name favorites -_id'
 	});
 };
+
+ArticleSchema.methods.unfavorited = function(cb) {
+	var self = this;
+	User.count({}, function( err, count){
+		self.favoritesCount = count;
+		self.save(cb);
+	}).populate({
+		path: 'favorites',
+		match: { favorites: { $in: self._id }},
+		select: 'name favorites -_id'
+	});
+};
+
 
 mongoose.model('Article', ArticleSchema);

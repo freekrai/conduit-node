@@ -29,6 +29,18 @@ UserSchema.methods.follow = function(id, cb){
 	this.save(cb);
 };
 
+UserSchema.methods.doiFollow = function(id){
+	var returnValue = false;
+	this.following.forEach( function( followId ){
+		if( followId.toString() === id.toString() ){
+			returnValue = true;
+			return true;
+		}
+	});
+	return returnValue;
+};
+
+
 UserSchema.methods.unfollow = function(id, cb){
 	this.following.remove(id);
 	this.save(cb);
@@ -40,9 +52,21 @@ UserSchema.methods.favorite = function(id, cb){
 	this.save(cb);
 };
 UserSchema.methods.unfavorite = function(id, cb){
-	this.favorites.remove(id);
+	this.favorites.remove( id );
 	this.save(cb);
 };
+
+UserSchema.methods.doiFavorite = function(id){
+	var returnValue = false;
+	this.favorites.forEach( function( faveId ){
+		if( faveId.toString() === id.toString() ){
+			returnValue = true;
+			return true;
+		}
+	});
+	return returnValue;
+};
+
 
 
 UserSchema.methods.generateJWT = function() {

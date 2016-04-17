@@ -4,6 +4,7 @@ var fs = require('fs'),
 	methods = require('methods'),
 	express = require('express'),
 	bodyParser = require('body-parser'),
+	session = require('express-session'),
 	cors = require('cors'),
 	isProduction = process.env.NODE_ENV === 'production';
 		
@@ -14,11 +15,13 @@ app.use( cors() );
 
 // Normal express config defaults
 app.use(require('morgan')('dev'));
-// app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use( bodyParser.json() );
 
 app.use(require('method-override')());
 app.use(express.static(__dirname + '/public'));
+
+app.use(session({ secret: 'conduit', cookie: { maxAge: 60000 } }));
 
 if ( !isProduction ) {
 	app.use(require('errorhandler')());
@@ -31,8 +34,8 @@ require('./models/Articles');
 require('./models/Users');
 require('./models/Comments');
 
-var routes = require('./routes/index');
-app.use('/', routes);
+require('./routes/users')(app);
+require('./routes/articles')(app);
 
 /// catch 404 and forward to error handler
 app.use(function(req, res, next) {
