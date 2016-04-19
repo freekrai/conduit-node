@@ -100,8 +100,11 @@ module.exports = function(app) {
 	});
 	
 	app.post('/api/users/login', function(req, res, next){
-		if(!req.body.user.email || !req.body.user.password){
-			return res.status(400).json({message: 'Please fill out all fields'});
+		if(!req.body.user.email){
+			return res.status(422).json({email: "can't be blank"});
+		}
+		if(!req.body.user.password){
+			return res.status(422).json({password: "can't be blank"});
 		}
 		User.findOne({ email: req.body.user.email }, function (err, user) {
 			if (err) { return next(err); }
@@ -122,8 +125,14 @@ module.exports = function(app) {
 	});
 	
 	app.post('/api/users', function(req, res, next){
-		if(!req.body.user.username || !req.body.user.email || !req.body.user.password){
-			return res.status(400).json({message: 'Please fill out all fields'});
+		if(!req.body.user.username){
+			return res.status(422).json({username: "can't be blank"});
+		}
+		if(!req.body.user.email){
+			return res.status(422).json({email: "can't be blank"});
+		}
+		if(!req.body.user.password){
+			return res.status(422).json({password: "can't be blank"});
 		}
 		
 		var user = new User();
