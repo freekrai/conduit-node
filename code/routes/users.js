@@ -5,6 +5,7 @@ var _ = require('underscore');
 var Article = mongoose.model('Article');
 var Comment = mongoose.model('Comment');
 var User = mongoose.model('User');
+var passport = require('passport');
 
 
 module.exports = function(app) {
@@ -106,22 +107,17 @@ module.exports = function(app) {
 		if(!req.body.user.password){
 			return res.status(422).json({password: "can't be blank"});
 		}
-		User.findOne({ email: req.body.user.email }, function (err, user) {
-			if (err) { return next(err); }
-			if (!user) {
-				return next(new Error("Incorrect username."));
-			}
-			if (!user.validPassword(req.body.user.password)) {
-				return next(new Error("Incorrect password."));
-			}
+		var tmpReq = {
+			body: req.body.user
+		};
+		passport.authenticate('local', function(err, user, info){
+			if(err){ return next(err); }
 			if(user){
-				req.session.user = user;
-				req.session.save(function(err) {});
-				return userCallback(res, user, 'user');
+				return res.json({token: user.generateJWT()});
 			} else {
 				return res.status(401).json(info);
 			}
-		});
+		})(tmpReq, res, next);
 	});
 	
 	app.post('/api/users', function(req, res, next){
@@ -208,7 +204,7 @@ module.exports = function(app) {
 			return res.json({profile:{
 				"username": user.username,
 				"bio": user.bio,
-				"image": user.image,
+				"image": user.image || "https://static.productionready.io/images/smiley-cyrus.jpg",
 				"following": following
 			}});
 		}	

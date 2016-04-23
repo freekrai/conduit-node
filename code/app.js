@@ -6,6 +6,7 @@ var fs = require('fs'),
 	bodyParser = require('body-parser'),
 	session = require('express-session'),
 	cors = require('cors'),
+	passport = require('passport'),
 	isProduction = process.env.NODE_ENV === 'production';
 		
 // Create global app object
@@ -21,7 +22,7 @@ app.use( bodyParser.json() );
 app.use(require('method-override')());
 app.use(express.static(__dirname + '/public'));
 
-app.use(session({ secret: 'conduit', cookie: { maxAge: 60000 } }));
+app.use(session({ secret: 'conduit', cookie: { maxAge: 60000 }, resave: false, saveUninitialized: false  }));
 
 if ( !isProduction ) {
 	app.use(require('errorhandler')());
@@ -33,6 +34,8 @@ mongoose.connect('mongodb://localhost/conduit');
 require('./models/Articles');
 require('./models/Users');
 require('./models/Comments');
+
+require('./config/passport');
 
 require('./routes/users')(app);
 require('./routes/articles')(app);

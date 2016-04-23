@@ -326,12 +326,12 @@ module.exports = function(app) {
 				"createdAt": article.createdAt,
 				"updatedAt": article.updatedAt,
 				"tagList": article.tagList,
-				"favorited": false,
+				"favorited": ifavorite,
 				"favoritesCount": article.favoritesCount,
 				"author": {
 					"username": article.author.username,
 					"bio": article.author.bio,
-					"image": article.author.image,
+					"image": article.author.image|| "https://static.productionready.io/images/smiley-cyrus.jpg",
 					"following": ifollow
 				}
 			});	
@@ -359,7 +359,7 @@ module.exports = function(app) {
 					"author": {
 						"username": article.author.username,
 						"bio": article.author.bio,
-						"image": article.author.image,
+						"image": article.author.image || "https://static.productionready.io/images/smiley-cyrus.jpg",
 						"following": ifollow
 					}
 				});
