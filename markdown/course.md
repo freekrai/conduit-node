@@ -211,6 +211,7 @@ function userCallback(res, user, key, following ){
 
 
 {x: handling sessions}
+
 In our JWT payload, we're including both the id and username of the user, and setting the
 expiration time of the token to 60 days in the future. 
 
@@ -234,6 +235,7 @@ var auth = jwt({
 ```
 
 {x: create registration }
+
 Registration is handled by our `users` route. 
 
 Inside our `users.js` file in the `routes` folder, we add an endpoint:
@@ -270,6 +272,7 @@ format in the [documentation](https://github.com/GoThinkster/productionready/blo
 Now, let's set up the rest of our user routes so we can edit the user.
 
 {x: login }
+
 Let's log our user in, this is handled by our `users` route. 
 
 Inside our `users.js` file in the `routes` folder, we add an endpoint:
@@ -297,6 +300,7 @@ app.post('/api/users/login', function(req, res, next){
 ```
 
 {x: edit a user }
+
 Editing a user isn't much different than creating one, inside our `users.js` file in the `routes` folder, we add an endpoint:
 
 ```javascript
@@ -335,6 +339,7 @@ app.put('/api/user', auth, function(req, res, next){
 This will update the user that is passed inside the JWT session so that a user can only edit themselves.
 
 {x: get a user's profile}
+
 We want to view a user's profile and see if we follow them or not, this is where we'll use the `doiFollow` function in our `Users` model.
 
 Inside our `users.js` file in the `routes` folder, we add an endpoint:
@@ -353,6 +358,7 @@ app.get('/api/profiles/:username', function(req, res, next){
 ```
 
 {x: following and unfollowing users}
+
 Since we're being social, we want to be able to follow and unfollow users. Add the following two endpoints to our `users.js` file in the `routes` folder:
 
 ```javascript
@@ -406,23 +412,29 @@ update the fields of that user. You can customize the parameters being sent by
 Postman in the Body tab of each request.
 
 {x: test registration postman}
+
 Create an account using the Register request in Postman
 
 {x: test login postman}
+
 Test the Login endpoint using Postman
 
 {x: test registration error postman}
+
 Try registering another user with the same email or username, you should get
 an error back from the backend
 
 {x: test login error postman}
+
 Try logging in to the user you created with an invalid password, you should get
 an error back from the backend
 
 {x: test user fetch postman}
+
 Test the Current User endpoint using Postman
 
 {x: test update user postman}
+
 Try updating the email, username, bio, or image for the user
 
 ## Handling the Articles
@@ -437,8 +449,10 @@ some articles. If you hit the Feed endpoint with Postman, you should see the
 articles from the users that your user is following.
 
 {x: ensure following authors}
+
 Make sure your user is following another user who has created some articles
 
 {x: test feed endpoint postman}
+
 Use the "Feed" request in Postman to test the Feed endpoint we created. We
 should see the most recent articles from users we're following.
