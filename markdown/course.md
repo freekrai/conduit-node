@@ -183,7 +183,6 @@ These models tell our app how to work, from what fields to use in the database, 
 
 ## Setting up Registration and Login
 
-
 {x: Make it look good}
 
 First, we want to control our user output, for that, we've created a universal callback function called `userCallback` which will take the information passed to it and format it:
@@ -208,7 +207,6 @@ function userCallback(res, user, key, following ){
 	}	
 }
 ```
-
 
 {x: handling sessions}
 
@@ -357,48 +355,6 @@ app.get('/api/profiles/:username', function(req, res, next){
 });
 ```
 
-{x: following and unfollowing users}
-
-Since we're being social, we want to be able to follow and unfollow users. Add the following two endpoints to our `users.js` file in the `routes` folder:
-
-```javascript
-app.post('/api/profiles/:username/follow', auth, function(req, res, next){
-	var id = req.payload.id;
-	var follow = req.user._id;
-	var query = User.findById(id);
-	query.exec(function (err, user){
-		if (err) { return next(err); }
-		if (!user) { return next(new Error("can't find user")); }
-		if(user){
-			user.follow(follow, function(err, user){
-				if (err) { return next(err); }
-				User.findById(follow).exec(function (err, followuser){
-					return userCallback(res, followuser, 'profile', user.doiFollow( follow ) );
-				});
-			});
-		}
-	});	
-});
-
-app.delete('/api/profiles/:username/follow', auth, function(req, res, next){
-	var id = req.payload.id;
-	var follow = req.user._id;
-	var query = User.findById(id);
-	query.exec(function (err, user){
-		if (err) { return next(err); }
-		if (!user) { return next(new Error("can't find user")); }
-		if(user){
-			user.unfollow(follow, function(err, user){
-				if (err) { return next(err); }
-				User.findById(follow).exec(function (err, followuser){
-					return userCallback(res, followuser, 'profile', user.doiFollow( follow ) );
-				});
-			});
-		}
-	});		
-});
-```
-
 ## Testing Authentication with Postman
 
 Now we can to start our Node server using `node app.js`. We should be able to run
@@ -437,9 +393,536 @@ Test the Current User endpoint using Postman
 
 Try updating the email, username, bio, or image for the user
 
-## Handling the Articles
+
+## Following and Unfollowing
+
+Since we're being social, we want to be able to follow and unfollow users. Add the following two endpoints to our `users.js` file in the `routes` folder:
+
+{x: following a user}
+
+```javascript
+app.post('/api/profiles/:username/follow', auth, function(req, res, next){
+	var id = req.payload.id;
+	var follow = req.user._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.follow(follow, function(err, user){
+				if (err) { return next(err); }
+				User.findById(follow).exec(function (err, followuser){
+					return userCallback(res, followuser, 'profile', user.doiFollow( follow ) );
+				});
+			});
+		}
+	});	
+});
+```
+
+{x: unfollowing a user}
+
+```javascript
+app.delete('/api/profiles/:username/follow', auth, function(req, res, next){
+	var id = req.payload.id;
+	var follow = req.user._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.unfollow(follow, function(err, user){
+				if (err) { return next(err); }
+				User.findById(follow).exec(function (err, followuser){
+					return userCallback(res, followuser, 'profile', user.doiFollow( follow ) );
+				});
+			});
+		}
+	});		
+});
+```
+
+We use two functions here `follow` and `unfollow` which are part of our `Users` model. These functions will modify an array of Users that we call `following`, also called a subdocument.
+
+The `follow` function adds users to the `following` array and save and the `unfollow` function removes users from the `following` array and saves.
+
+Using subdocuments such as `following` will let us populate our data faster, as rather than instructing our app to do extra loops and queries, we can just use functions like `populate('following')`.
+
+## Testing Following using Postman
+
+If you haven't already, create a couple more users on the backend so that we
+can test out our following/followers functionality
+
+{x: test follow postman}
+Follow a user using the "Follow Profile" request in Postman
+
+{x: test unfollow postman}
+Unfollow a user using the "Unfollow Profile" request in Postman
+
+# Handling the Articles
+
+Now that we can authenticate and retrieve users from our backend, let's build
+out the Articles functionality of our application. We'll start out by
+generating our Articles model. Articles will need a title, body and description.
+
+We'll be generating a slug for each article which will be used as an identifier
+for the client. The slug will be based off of the title, which is downcased and
+has all punctuation replaced with dashes.
+
+{x: add article resources route}
+
+We're going to create a new route called `articles.js` inside our `routes` folder which will handle all routes.
+
+{x: Make it look good}
+
+First, we want to control our articles output, for that, we've created two universal callback functions.
+
+The first is called `commentCallback` which will take the information passed to it and format it:
+
+```javascript
+// handle output of comments
+function commentCallback(req, res, comments, single ){
+	var single = single || false;
+	var returnValue = [];
+	if( single ){
+		var comment = comments;
+		returnValue.push({
+			"body": comment.body,
+			"createdAt": comment.createdAt,
+			"author": {
+				"username": comment.author.username,
+				"bio": comment.author.bio,
+				"image": comment.author.image,
+				"following": false
+			}
+		});	
+	}else{
+		var returnValue = [];
+		comments.forEach( function( comments ){
+			returnValue.push({
+				"body": comment.body,
+				"createdAt": comment.createdAt,
+				"author": {
+					"username": comment.author.username,
+					"bio": comment.author.bio,
+					"image": comment.author.image,
+					"following": false
+				}
+			});
+		});
+	}	
+	if( returnValue.length > 1 ){
+		res.json({"comments": returnValue});
+	}else{
+		res.json({"comment": returnValue});
+	}
+}
+```	
+
+Our second callback function is called `articleCallback`, which handles outputting our articles.
+
+```javascript
+// handle output of articles.
+function articleCallback(req, res, articles, single ){
+	var sess = req.session		
+	var single = single || false;
+	var returnValue = [];
+	if( single ){
+		var article = articles;
+
+		if( sess.user ){
+			User.findOne({ email: sess.user.email }, function (err, user) {
+				var ifavorite = user.doiFavorite( article._id );
+				var ifollow = user.doiFollow( article.author._id );
+			});
+		}else{
+			var ifavorite = false;
+			var ifollow = false;
+		}
+		returnValue.push({
+			"slug": article.slug,
+			"title": article.title,
+			"description": article.description,
+			"body": article.body,
+			"createdAt": article.createdAt,
+			"updatedAt": article.updatedAt,
+			"tagList": article.tagList,
+			"favorited": ifavorite,
+			"favoritesCount": article.favoritesCount,
+			"author": {
+				"username": article.author.username,
+				"bio": article.author.bio,
+				"image": article.author.image|| "https://static.productionready.io/images/smiley-cyrus.jpg",
+				"following": ifollow
+			}
+		});	
+	}else{
+		articles.forEach( function( article ){
+			if( sess.user ){
+				User.findOne({ email: sess.user.email }, function (err, user) {
+					var ifavorite = user.doiFavorite( article._id );
+					var ifollow = user.doiFollow( article.author._id );
+				});
+			}else{
+				var ifavorite = false;
+				var ifollow = false;
+			}
+			returnValue.push({
+				"slug": article.slug,
+				"title": article.title,
+				"description": article.description,
+				"body": article.body,
+				"tagList": article.tagList,
+				"createdAt": article.createdAt,
+				"updatedAt": article.updatedAt,
+				"favorited": ifavorite,
+				"favoritesCount": article.favoritesCount,
+				"author": {
+					"username": article.author.username,
+					"bio": article.author.bio,
+					"image": article.author.image || "https://static.productionready.io/images/smiley-cyrus.jpg",
+					"following": ifollow
+				}
+			});
+		});
+	}
+	if( returnValue.length > 1 ){
+		res.json({"articles": returnValue, 'articlesCount': returnValue.length});
+	}else{
+		res.json({"article": returnValue});
+	}
+}
+```
+
+{x: return a list of articles}
+
+We want to set up our `/api/articles` endpoint, which lets us return a list of articles and use various query strings to control it.
+
+For example:
+
+- `author` returns only articles by a specified author
+- `favorited` returns only articles favorited by username specified as `favorited`
+- `tag` returns only articles containing a passed tag
+- `limit` specifies how many articles to return, default `20`
+- `offset` is the offset, used for pagination, default `0`
+
+When we call this endpoint, we also include a call to `populate('author')`, this will fill the `author` subdocument with the information from the corresponding Users collection.
+
+```javascript
+app.get('/api/articles', function(req, res, next) {
+	var query = {};
+	if( typeof req.query.author !== 'undefined' ){
+		query['author'] = req.query.author;
+	}
+	if( typeof req.query.favorited !== 'undefined' ){
+		User.find({username: req.query.favorited}, function(err, user){
+			if (err) { return next(err); }
+			if (!user) { return next(new Error("can't find user")); }
+			if(user){
+				var query = {};
+				if( typeof user.favorites !== 'undefined' ){
+					query['_id'] = {"$in" : user.favorites};
+				}
+			}
+		});
+	}
+	var limit = 20;
+	var offset = 0;
+	if( typeof req.query.tag !== 'undefined' ){
+		query['tagList'] = {"$in" : [req.query.tag]};
+	}
+	if( typeof req.query.limit !== 'undefined' ){
+		limit = req.query.limit;
+	}
+	if( typeof req.query.offset !== 'undefined' ){
+		offset = req.query.offset;
+	}
+	Article.find(query, function(err, articles){
+		if(err){ return next(err); }
+		articleCallback(req, res, articles );
+	})
+	.limit( limit )
+	.skip( offset )
+	.populate('author');
+});
+```
+
+{x: create an article}
+
+```javascript
+app.post('/api/articles', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			var article = new Article(req.body.article);
+			article.author = user;
+			article.slugify();	
+			article.save(function(err, article){
+				if(err){ return next(err); }
+				articleCallback(req, res, article, true );
+			});
+		}
+	});
+});
+```
+
+{x: get an article}
+
+```javascript
+
+// return a article
+app.get('/api/articles/:article', function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		articleCallback(req, res, article, true );
+	});
+});
+```
+
+{x: update an article}
+
+```javascript
+// update article
+app.put('/api/articles/:article', auth, function(req, res, next) {
+	if( typeof req.body.article.title !== 'undefined' ){
+		req.article.title = req.body.article.title;
+		req.article.slug();
+	}
+	if( typeof req.body.article.description !== 'undefined' ){
+		req.article.description = req.body.article.description;
+	}
+	if( typeof req.body.article.body !== 'undefined' ){
+		req.article.body = req.body.article.body;
+	}
+	req.article.save(function(err, article){
+		if(err){ return next(err); }
+		articleCallback(req, res, article, true );
+	});
+});
+```
+
+{x: delete an article}
+
+```javascript
+// delete article
+app.delete('/api/articles/:article', auth, function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		req.article.remove();
+		articleCallback(req, res, article, true );
+	});
+});
+```
+
+## Testing Articles with Postman
+
+Now we can test our endpoints using Postman. We should be able to create, retrieve,
+update and delete articles, along with being able to List all the Articles in
+the database. Using the same endpoint to List articles, we can also pass in a
+query parameter of `author` to filter posts in our database by authors' usernames
+
+{x: test create article postman}
+
+Create a couple articles using the "Create Article" request in Postman.
+Creating an article with the same title should result in an error, so you'll
+have to change the values in the body of the request to create additional
+articles
+
+{x: test show article postman}
+
+Retrieve the article you just created using the "Single Article by slug"
+request in Postman.
+
+{x: test list all articles postman}
+
+Retrieve all articles from the backend using the "All Articles" request in
+Postman.
+
+{x: test list author articles postman}
+
+Filter the articles by author using the "Articles by Author" request in Postman.
+
+{x: test destroy article postman}
+
+Delete an article using the "Delete Article" request in Postman.
 
 
+## Adding Favorites to Articles
+
+Let's set up endpoints to store a user's favorite articles, this will work by adding an article to the user's `favorites` subdocument, and then just removing that article later.
+
+{x: favorite an article}
+
+Create the action for favoriting articles
+
+```javascript
+app.post('/api/articles/:article/favorite', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var favorite = req.article._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.favorite(favorite, function(err, user){
+				if (err) { return next(err); }
+				req.article.favorited( function( err, article){
+					return articleCallback(req, res, article, true);
+				});
+			});
+		}
+	});	
+});
+```
+
+{x: unfavorite an article}
+
+Create the action for unfavoriting articles
+
+
+```javascript
+app.delete('/api/articles/:article/favorite', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var favorite = req.article._id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			user.unfavorite(favorite, function(err, user){
+				if (err) { return next(err); }
+				req.article.unfavorited( function( err, article){
+					return articleCallback(req, res, article, true);
+				});
+			});
+		}
+	});	
+});
+```
+
+## Testing Favoriting using Postman
+
+{x: favorite postman}
+
+Favorite an article using the "Favorite Article" request
+
+{x: unfavorite postman}
+
+Unfavorite an article using the "Unfavorite Article" request
+
+### Handling tags
+
+The endpoint to return a list of tags from our articles is pretty simple, it queries all articles, builds a list of tags from the `tagList` variable and then returns only the unique tags, this way we don't get a set of duplicated tags being returned.
+
+{x: list tags}
+
+```javascript
+// return a list of tags
+app.get('/api/tags', function(req, res, next) {
+	Article.find({}, function(err, articles){
+		if(err){ return next(err); }
+		var returnValue = [];
+		articles.forEach( function( article ){
+			var tags = article.tagList;
+			for(var i = 0; i < tags.length; i++) {
+				returnValue.push( tags[i] );
+			}
+		});
+		returnValue = _.uniq( returnValue );
+		res.json({"tags": returnValue});
+	})
+});
+```
+
+## Comments
+
+We want to return a list of comments made to an article, save new comments and also be able to delete a comment, so these three endpoints will handle that:
+
+{x: list comments}
+
+```javascript
+// return an article's comments
+app.get('/api/articles/:article/comments', function(req, res, next) {
+	req.article.populate('comments author', function(err, article) {
+		commentCallback(req, res, req.article.comments);
+	});
+});
+```
+
+{x: create comment}
+
+```javascript
+// create a new comment
+app.post('/api/articles/:article/comments', auth, function(req, res, next) {
+	var comment = new Comment(req.comment.body);
+	comment.article = req.article;
+	comment.author = req.payload.username;
+	
+	comment.save(function(err, comment){
+		if(err){ return next(err); }
+		req.article.comments.push(comment);
+		req.article.save(function(err, article) {
+			if(err){ return next(err); }
+			
+			res.json(comment);
+		});
+	});
+});
+```
+
+{x: delete a comment}
+
+```javascript
+app.delete('/api/articles/:article/comments/:comment', auth, function(req, res, next) {
+	req.comment.remove();
+	commentCallback(req, res, req.comment, true );
+});
+```
+
+### Article Feed
+
+The articles feed is used to display a list of articles when a user first logs in, this could include recent articles by other users that user is following, 
+
+{x: build an article feed}
+
+```javascript
+app.get('/api/articles/feed', auth, function(req, res, next) {
+	var id = req.payload.id;
+	var query = User.findById(id);
+	query.exec(function (err, user){
+		if (err) { return next(err); }
+		if (!user) { return next(new Error("can't find user")); }
+		if(user){
+			//	get 10 most recent articles published by list of users this user is following...
+			var query = {};
+			if( typeof user.following !== 'undefined' ){
+				query['author'] = {"$in" : user.following};
+			}
+			var limit = 20;
+			var offset = 0;
+			if( typeof req.query.tag !== 'undefined' ){
+				query['tagList'] = {"$in" : [req.query.tag]};
+			}
+			if( typeof req.query.limit !== 'undefined' ){
+				limit = req.query.limit;
+			}
+			if( typeof req.query.offset !== 'undefined' ){
+				offset = req.query.offset;
+			}
+			Article.find(query, function(err, articles){
+				if(err){ return next(err); }
+				articleCallback(req, res, articles );
+			})
+			.limit( limit )
+			.skip( offset )
+			.populate('author');
+		}
+	})
+});
+```
+
+This endpoint uses some of the same query string variables as our `/api/articles` endpoint.
 
 ## Testing the Feed Endpoint using Postman
 
