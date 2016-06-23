@@ -113,7 +113,8 @@ module.exports = function(app) {
 		passport.authenticate('local', function(err, user, info){
 			if(err){ return next(err); }
 			if(user){
-				return res.json({token: user.generateJWT()});
+				user.token = user.generateJWT();
+				return userCallback(res, user, 'user');
 			} else {
 				return res.status(401).json(info);
 			}
