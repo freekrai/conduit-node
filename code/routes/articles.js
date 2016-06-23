@@ -59,7 +59,14 @@ module.exports = function(app) {
 	app.get('/api/articles', function(req, res, next) {
 		var query = {};
 		if( typeof req.query.author !== 'undefined' ){
-			query['author'] = req.query.author;
+			User.find({username: req.query.author}, function(err, author){
+				if (err) { return next(err); }
+				if (!author) { return next(new Error("can't find user")); }
+				if(author){
+					query['author'] = author._id;
+				}
+			});
+//			query['author'] = req.query.author;
 		}
 		if( typeof req.query.favorited !== 'undefined' ){
 			User.find({username: req.query.favorited}, function(err, user){
@@ -279,6 +286,7 @@ module.exports = function(app) {
 					"following": false
 				}
 			});	
+			res.json({"comment": returnValue[0]});
 		}else{
 			var returnValue = [];
 			comments.forEach( function( comments ){
@@ -293,12 +301,8 @@ module.exports = function(app) {
 					}
 				});
 			});
-		}	
-		if( returnValue.length > 1 ){
 			res.json({"comments": returnValue});
-		}else{
-			res.json({"comment": returnValue});
-		}
+		}	
 	}
 	
 	// handle output of articles.
@@ -335,6 +339,7 @@ module.exports = function(app) {
 					"following": ifollow
 				}
 			});	
+			res.json({"article": returnValue[0]});
 		}else{
 			articles.forEach( function( article ){
 				if( sess.user ){
@@ -364,11 +369,7 @@ module.exports = function(app) {
 					}
 				});
 			});
-		}
-		if( returnValue.length > 1 ){
 			res.json({"articles": returnValue, 'articlesCount': returnValue.length});
-		}else{
-			res.json({"article": returnValue});
 		}
 	}
 };
